@@ -14,7 +14,7 @@
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 # END LICENSE
 
-import os, os.path, sys
+import os, os.path, sys, logging
 
 
 class Plugin:
@@ -66,11 +66,11 @@ class PluginSystem:
         self.plugins = {}  # value : plugin instance
         self.enabled_plugins = [plugin for plugin in enabled_plugins.split(':') if plugin]  # list of names
 
-        print("[Plugins] Paths to search: ", plugin_paths)
+        logging.info("[Plugins] Paths to search: ".join(plugin_paths))
 
         for path in plugin_paths:
             if not os.path.isdir(path):
-                print("[Plugins] %s is not a directory." % path)
+                logging.info("[Plugins] "+path+" is not a directory.")
                 continue
 
             sys.path.append(path)
@@ -96,7 +96,7 @@ class PluginSystem:
                     if plugin_name in plugins_config:
                         self.plugins[plugin_name].Config.update(plugins_config[plugin_name])
 
-                    print("[Plugins] Found: ", plugin_name)
+                    logging.info("[Plugins] Found: ".join(plugin_name))
 
         for plugin in self.enabled_plugins:
             if not plugin in self.plugins.keys():
@@ -104,7 +104,7 @@ class PluginSystem:
                 self.enabled_plugins.remove(plugin)
             else:
                 self.plugins[plugin].enable()
-                print("[Plugins] Enabled: ", plugin)
+                logging.info("[Plugins] Enabled: ".join(plugin))
 
     def enable(self, name):
         if name not in self.enabled_plugins:

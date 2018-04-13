@@ -19,7 +19,11 @@ try:
 except ImportError:
     import json
 import os.path
+import base64
+import logging
 
+from base64 import b64decode
+from Crypto.Cipher import AES
 from otrverwaltung import path
 
 
@@ -40,10 +44,9 @@ class Config:
 
     def set(self, category, option, value):
         if option in ['email', 'password']:
-            print("Set [%(category)s][%(option)s] to *****" % {"category": category, "option": option})
+            logging.info("Set [%(category)s][%(option)s] to *****" % {"category": category, "option": option})
         else:
-            print("Set [%(category)s][%(option)s] to %(value)s" % {"category": category, "option": option,
-                                                                   "value": value})
+            logging.info("Set [%(category)s][%(option)s] to %(value)s" % {"category": category, "option": option, "value": value})
 
         try:
             for callback in self.__callbacks[category][option]:
@@ -58,10 +61,12 @@ class Config:
         value = self.__fields[category][option]
 
         if option in ['email', 'password']:
-            print("Get [%(category)s][%(option)s]: *****" % {"category": category, "option": option})
+            logging.info("Get [%(category)s][%(option)s]: *****" % {"category": category, "option": option})
         else:
-            print(
-                "Get [%(category)s][%(option)s]: %(value)s" % {"category": category, "option": option, "value": value})
+            if type(value) is list:
+                logging.info("Get [%(category)s][%(option)s]: %(value)s" % {"category": category, "option": option, "value": ''.join(value)})
+            else:
+                logging.info("Get [%(category)s][%(option)s]: %(value)s" % {"category": category, "option": option, "value": value})
 
         return value
 
@@ -75,9 +80,19 @@ class Config:
             except OSError:
                 pass
 
-            config_file = open(self.__config_file, "w")
-            print(("Writing to "), config_file)
-            json.dump(self.__fields, config_file, sort_keys=True, indent=4)
+            config_file = open(self.__config_file, "w", encoding='utf_8')
+            try:
+                if len(str(self.__fields['general']['password'])) > 0:
+                    # Encryption
+                    pad = lambda s: s + (self.__fields['general']['aes_blocksize'] - len(s) % self.__fields['general']['aes_blocksize']) * self.__fields['general']['aes_padding']
+                    EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
+                    encryption_suite = AES.new(b64decode(self.__fields['general']['aes_key'].encode('utf-8')))
+                    cipher_text = EncodeAES(encryption_suite, self.__fields['general']['password'])
+                    self.__fields['general']['password'] = base64.b64encode(cipher_text).decode('utf-8')
+            except ValueError:
+                self.__fields['general']['password']=self.__fields['general']['password']
+
+            json.dump(self.__fields, config_file, ensure_ascii=False, sort_keys=True, indent=4)
             config_file.close()
         except IOError as message:
             print("Config file not available. Dumping configuration:")
@@ -97,7 +112,19 @@ class Config:
         for category, options in self.__fields.items():
             for option, value in options.items():
                 try:
-                    self.set(category, option, json_config[category][option])
+                    if category is 'general' and option is 'password':
+                        try:
+                            # Decryption
+                            padding=json_config['general']['aes_padding']
+                            DecodeAES = lambda c, e: (c.decrypt(base64.b64decode(e)).decode("utf-8")).rstrip(padding)
+                            decryption_suite = AES.new(b64decode(json_config['general']['aes_key'].encode('utf-8')))
+                            b = base64.b64decode(json_config[category][option])
+                            plain_text = DecodeAES(decryption_suite, b)
+                            self.set(category, option, plain_text)
+                        except ValueError:
+                            self.set(category, option, json_config[category][option])
+                    else:
+                        self.set(category, option, json_config[category][option])
                 except KeyError:
                     self.set(category, option, value)
 
