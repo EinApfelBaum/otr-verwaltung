@@ -1,3 +1,11 @@
+Diese Version wird nicht mehr verwaltet/unterstützt.
+
+Die aktuelle OTR-Verwaltung3P Version ist hier zu finden:
+https://github.com/EinApfelBaum/otr-verwaltung3p
+
+Outdated!
+=========
+
 OTR-Verwaltung
 ==============
 
